@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MineWatch — Fatigue Detection System Docs</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --gold:#f5a623;--red:#ff4444;--green:#4caf6e;--blue:#4a9eff;
+    --border:#3a3530;--surface:#0b0908;--surface2:#111009;--bg:#0e0c0a;
+    --text:#d8d0c0;--muted:#a09888;--dim:#706860;
+  }
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-height:100vh;line-height:1.6}
+  a{color:inherit;text-decoration:none}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+  @keyframes warnblink{0%,100%{opacity:1}50%{opacity:0.25}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(245,166,35,0.4)}50%{box-shadow:0 0 0 8px rgba(245,166,35,0)}}
+  .fade{animation:fadeUp 0.6s ease both}
+  .fade-1{animation-delay:.1s}.fade-2{animation-delay:.2s}.fade-3{animation-delay:.3s}.fade-4{animation-delay:.4s}
+
+  /* NAVBAR */
+  nav{
+    position:fixed;top:0;left:0;right:0;z-index:100;
+    height:56px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 40px;background:rgba(14,12,10,0.96);
+    backdrop-filter:blur(12px);border-bottom:1px solid var(--border);
+  }
+  .nav-logo{display:flex;align-items:center;gap:10px}
+  .nav-hex{width:22px;height:22px;background:var(--gold);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);animation:warnblink 3s infinite}
+  .nav-title{font-family:'Oswald';font-size:17px;font-weight:700;letter-spacing:3px;color:#e8e0d0}
+  .nav-title span{color:var(--gold)}
+  .nav-badge{padding:2px 8px;font-size:8px;letter-spacing:2px;color:var(--gold);border:1px solid rgba(245,166,35,0.3);font-family:monospace;text-transform:uppercase}
+  .nav-links{display:flex;gap:4px}
+  .nav-links a{padding:6px 14px;font-size:9px;letter-spacing:2px;color:var(--muted);font-family:'Oswald';text-transform:uppercase;transition:color .2s;white-space:nowrap}
+  .nav-links a:hover{color:var(--gold)}
+
+  /* HERO */
+  .hero{
+    padding:110px 40px 60px;
+    border-bottom:2px solid var(--border);
+    background:var(--surface);
+    position:relative;overflow:hidden;
+  }
+  .hero::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:.6}
+  .hero::after{content:'MW';position:absolute;top:10px;right:30px;font-family:'Oswald';font-size:220px;font-weight:700;color:#fff;opacity:.025;line-height:1;pointer-events:none}
+  .hero-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:24px}
+  .tag{padding:5px 12px;font-size:9px;letter-spacing:2px;font-family:monospace;border:1px solid}
+  .tag-gold{color:var(--gold);border-color:rgba(245,166,35,.3);background:rgba(245,166,35,.07)}
+  .tag-green{color:var(--green);border-color:rgba(76,175,110,.3);background:rgba(76,175,110,.07)}
+  .tag-blue{color:var(--blue);border-color:rgba(74,158,255,.3);background:rgba(74,158,255,.07)}
+  .tag-red{color:var(--red);border-color:rgba(255,68,68,.3);background:rgba(255,68,68,.07)}
+  .hero h1{font-family:'Oswald';font-size:52px;font-weight:700;letter-spacing:2px;color:#f0e8d8;line-height:1.05;margin-bottom:16px}
+  .hero h1 span{color:var(--gold)}
+  .hero p{font-size:15px;color:var(--muted);max-width:620px;line-height:1.9;margin-bottom:32px}
+  .hero-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;max-width:600px}
+  .stat{background:var(--bg);border:1px solid var(--border);padding:16px 18px}
+  .stat-label{font-size:8px;letter-spacing:2px;color:var(--muted);font-family:monospace;text-transform:uppercase;margin-bottom:6px}
+  .stat-val{font-family:'Oswald';font-size:28px;font-weight:700;line-height:1}
+  .stat-unit{font-size:12px;color:var(--muted);margin-left:3px;font-weight:400}
+
+  /* MAIN LAYOUT */
+  .layout{display:flex;gap:0;max-width:1100px;margin:0 auto}
+  .sidebar{
+    width:220px;flex-shrink:0;padding:40px 0 40px 40px;
+    position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto;
+  }
+  .sidebar-section{margin-bottom:28px}
+  .sidebar-title{font-size:8px;letter-spacing:3px;color:var(--muted);font-family:monospace;text-transform:uppercase;margin-bottom:12px;padding-left:12px}
+  .sidebar a{
+    display:block;padding:7px 12px;font-size:11px;letter-spacing:1px;
+    color:var(--muted);font-family:'Oswald';text-transform:uppercase;
+    border-left:2px solid transparent;transition:all .2s;
+  }
+  .sidebar a:hover,.sidebar a.active{color:var(--gold);border-left-color:var(--gold);background:rgba(245,166,35,.05)}
+  .content{flex:1;padding:40px 40px 80px;min-width:0}
+
+  /* SECTION */
+  .section{padding-top:52px}
+  .section-label{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+  .section-bar{width:3px;height:18px;background:var(--gold);flex-shrink:0}
+  .section-tag{font-family:'Oswald';font-size:10px;letter-spacing:4px;color:var(--gold);text-transform:uppercase}
+  .section h2{font-family:'Oswald';font-size:30px;color:#e8e0d0;margin-bottom:12px;letter-spacing:1px}
+  .section > p{font-size:14px;color:var(--muted);line-height:1.9;max-width:680px;margin-bottom:28px}
+
+  /* LEVELS */
+  .levels{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-bottom:0}
+  .level{border-left-width:4px;border-left-style:solid;padding:16px 18px}
+  .level-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .level-name{font-family:'Oswald';font-size:13px;letter-spacing:2px}
+  .level p{font-size:12px;color:var(--muted);line-height:1.7}
+
+  /* ARCH DIAGRAM */
+  .arch{background:var(--surface);border:1px solid var(--border);padding:32px;overflow-x:auto;margin-bottom:2px}
+  .arch-flow{display:flex;align-items:center;justify-content:center;gap:6px;min-width:680px}
+  .arch-block{text-align:center;width:130px}
+  .arch-box{background:var(--bg);border:1px solid var(--border);border-top-width:2px;border-top-style:solid;padding:14px 12px}
+  .arch-label{font-size:8px;letter-spacing:2px;font-family:monospace;text-transform:uppercase;margin-bottom:6px}
+  .arch-name{font-family:'Oswald';font-size:13px;color:var(--text)}
+  .arch-sub{font-size:10px;color:var(--muted);margin-top:3px}
+  .arch-arrow{display:flex;flex-direction:column;align-items:center;gap:3px;padding:0 4px}
+  .arch-arrow-line{width:48px;height:1px;background:#504840;position:relative}
+  .arch-arrow-line::after{content:'';position:absolute;right:-4px;top:-3px;border-left:7px solid #504840;border-top:4px solid transparent;border-bottom:4px solid transparent}
+  .arch-arrow span{font-size:8px;color:var(--muted);font-family:monospace;white-space:nowrap}
+
+  /* STACK GRID */
+  .stack-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px}
+  .stack-card{background:var(--surface);border:1px solid var(--border);padding:20px}
+  .stack-header{font-size:8px;letter-spacing:2px;font-family:monospace;text-transform:uppercase;margin-bottom:14px}
+  .stack-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:7px 0;border-bottom:1px solid var(--border)}
+  .stack-row:last-child{border-bottom:none}
+  .stack-key{color:var(--muted)}
+  .stack-val{font-family:monospace;color:var(--text);font-size:11px}
+
+  /* API */
+  .endpoint{border:1px solid var(--border);margin-bottom:2px}
+  .endpoint-header{display:flex;align-items:center;gap:10px;padding:12px 18px;background:var(--surface);border-bottom:1px solid var(--border)}
+  .method{padding:3px 10px;font-size:9px;font-family:monospace;font-weight:700;letter-spacing:1px}
+  .method-get{color:var(--green);background:rgba(76,175,110,.12);border:1px solid rgba(76,175,110,.25)}
+  .method-post{color:var(--gold);background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.25)}
+  .endpoint-path{font-family:monospace;font-size:13px;color:var(--text)}
+  .endpoint-desc{font-size:11px;color:var(--muted);margin-left:auto}
+  .endpoint-body{padding:16px 18px;background:#0a0908}
+  .code-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .code-label{font-size:9px;letter-spacing:2px;color:var(--muted);font-family:monospace;margin-bottom:7px;text-transform:uppercase}
+  .code-block{background:var(--bg);border:1px solid var(--border);padding:14px 16px;font-family:monospace;font-size:11px;color:var(--text);line-height:1.9}
+  .code-block .s{color:var(--green)}
+  .code-block .n{color:var(--gold)}
+  .code-block .b{color:var(--blue)}
+  .code-block .r{color:var(--red)}
+
+  /* FEATURES */
+  .features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}
+  .feat{background:var(--surface);border:1px solid var(--border);padding:20px}
+  .feat-icon{font-size:22px;margin-bottom:10px}
+  .feat h3{font-family:'Oswald';font-size:13px;letter-spacing:1px;color:#e8e0d0;margin-bottom:8px;text-transform:uppercase}
+  .feat p{font-size:12px;color:var(--muted);line-height:1.7}
+
+  /* SETUP */
+  .setup-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:2px}
+  .setup-card{background:var(--surface);border:1px solid var(--border)}
+  .setup-header{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+  .setup-dot{width:6px;height:6px;border-radius:50%}
+  .setup-title{font-size:9px;letter-spacing:2px;font-family:monospace;text-transform:uppercase}
+  .setup-code{padding:18px 20px;font-family:monospace;font-size:12px;line-height:2;color:var(--muted)}
+  .setup-code .cmd{color:var(--green)}
+  .setup-code .arg{color:var(--text)}
+  .setup-code .comment{color:var(--muted)}
+  .req-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 32px;padding:18px 20px;font-family:monospace;font-size:12px;line-height:1.9}
+  .req-name{color:var(--text)}
+  .req-ver{color:var(--muted)}
+
+  /* ML MODEL */
+  .model-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:2px}
+  .feat-row{display:flex;align-items:center;gap:10px;font-size:12px;padding:7px 0;border-bottom:1px solid var(--border)}
+  .feat-row:last-child{border-bottom:none}
+  .feat-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .feat-name{color:var(--text);flex:1}
+  .feat-unit{font-size:10px;color:var(--muted);font-family:monospace}
+  .classes{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}
+  .cls{background:var(--bg);padding:16px;text-align:center;border:1px solid}
+  .cls-num{font-family:'Oswald';font-size:28px;font-weight:700;margin-bottom:6px}
+  .cls-name{font-size:10px;letter-spacing:3px;font-family:monospace;text-transform:uppercase}
+
+  /* FOOTER */
+  footer{border-top:1px solid var(--border);padding:28px 40px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;background:var(--surface)}
+  .footer-logo{display:flex;align-items:center;gap:8px}
+  .footer-hex{width:14px;height:14px;background:var(--gold);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)}
+  .footer-name{font-family:'Oswald';font-size:13px;letter-spacing:2px;color:var(--muted)}
+  .footer-name span{color:var(--gold)}
+  .footer-stack{font-size:11px;color:var(--muted);font-family:monospace}
+
+  /* DIVIDER */
+  .divider{height:1px;background:var(--border);margin:6px 0}
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar{width:4px;height:4px}
+  ::-webkit-scrollbar-track{background:var(--bg)}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+  /* RESPONSIVE */
+  @media(max-width:768px){
+    nav{padding:0 16px}
+    .nav-links{display:none}
+    .hero{padding:80px 16px 40px}
+    .hero h1{font-size:36px}
+    .hero-stats{grid-template-columns:repeat(2,1fr)}
+    .layout{flex-direction:column}
+    .sidebar{display:none}
+    .content{padding:24px 16px 60px}
+    .levels,.code-grid,.stack-grid,.setup-grid,.model-grid,.features-grid,.classes{grid-template-columns:1fr}
+    .arch-flow{flex-wrap:wrap;gap:8px}
+    .arch-arrow{display:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav>
+  <div class="nav-logo">
+    <div class="nav-hex"></div>
+    <span class="nav-title">Mine<span>Watch</span></span>
+    <span class="nav-badge">Docs v1.0</span>
+  </div>
+  <div class="nav-links">
+    <a href="#overview">Overview</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#api">API</a>
+    <a href="#features">Features</a>
+    <a href="#setup">Setup</a>
+    <a href="#model">ML Model</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-tags fade fade-1">
+    <span class="tag tag-blue">MEDIAPIPE</span>
+    <span class="tag tag-gold">FLASK API</span>
+    <span class="tag tag-blue">REACT + VITE</span>
+    <span class="tag tag-red">SCIKIT-LEARN</span>
+    <span class="tag tag-green">DEPLOYED ON RENDER + VERCEL</span>
+  </div>
+  <h1 class="fade fade-2">Fatigue Detection<br><span>System</span></h1>
+  <p class="fade fade-3">Real-time miner fatigue monitoring using computer vision, eye tracking, blink analysis, head pose estimation, and machine learning. Built for underground mining safety environments.</p>
+  <div class="hero-stats fade fade-4">
+    <div class="stat">
+      <div class="stat-label">Session</div>
+      <div class="stat-val" style="color:var(--gold)">20<span class="stat-unit">sec</span></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Frame Rate</div>
+      <div class="stat-val" style="color:var(--green)">8<span class="stat-unit">fps</span></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">EAR Threshold</div>
+      <div class="stat-val" style="color:var(--blue)">0.21</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Fatigue Levels</div>
+      <div class="stat-val" style="color:var(--red)">3</div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-title">Navigation</div>
+      <a href="#overview" class="active">01 Overview</a>
+      <a href="#architecture">02 Architecture</a>
+      <a href="#api">03 API Reference</a>
+      <a href="#features">04 Features</a>
+      <a href="#setup">05 Setup</a>
+      <a href="#model">06 ML Model</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-title">Links</div>
+      <a href="https://fatigue-backend-pijd.onrender.com" target="_blank">Backend URL ↗</a>
+      <a href="https://github.com" target="_blank">GitHub ↗</a>
+    </div>
+    <div style="padding:12px;background:rgba(255,68,68,.06);border:1px solid rgba(255,68,68,.2);border-left:3px solid var(--red);font-size:10px;line-height:1.7;color:#ff8888;font-family:monospace;margin-top:12px">
+      ⚠ FREE TIER<br/>Server may take<br/>50s+ to cold start
+    </div>
+  </aside>
+
+  <!-- CONTENT -->
+  <main class="content">
+
+    <!-- OVERVIEW -->
+    <section id="overview" class="section fade">
+      <div class="section-label">
+        <div class="section-bar"></div>
+        <span class="section-tag">01 / Overview</span>
+      </div>
+      <h2>What is MineWatch?</h2>
+      <p>MineWatch is a real-time fatigue detection system for coal mine workers. It uses webcam-based computer vision to track eye aspect ratio, blink rate, and head pose — combined with environmental sensor data — to classify fatigue levels into three categories.</p>
+
+      <div class="levels">
+        <div class="level" style="border-color:var(--green);background:rgba(76,175,110,.05);border:1px solid rgba(76,175,110,.25);border-left:4px solid var(--green)">
+          <div class="level-header">
+            <span style="color:var(--green);font-size:16px">●</span>
+            <span class="level-name" style="color:var(--green)">NORMAL</span>
+          </div>
+          <p>Alert and focused. Safe to continue operations without restrictions.</p>
+        </div>
+        <div class="level" style="border:1px solid rgba(245,166,35,.25);border-left:4px solid var(--gold);background:rgba(245,166,35,.05)">
+          <div class="level-header">
+            <span style="color:var(--gold);font-size:16px">◆</span>
+            <span class="level-name" style="color:var(--gold)">MODERATE</span>
+          </div>
+          <p>Fatigue building. Schedule immediate 15-minute rest break now.</p>
+        </div>
+        <div class="level" style="border:1px solid rgba(255,68,68,.25);border-left:4px solid var(--red);background:rgba(255,68,68,.05)">
+          <div class="level-header">
+            <span style="color:var(--red);font-size:16px;animation:warnblink 1s infinite;display:inline-block">▲</span>
+            <span class="level-name" style="color:var(--red)">HIGH RISK</span>
+          </div>
+          <p>Dangerous fatigue detected. STOP — report to supervisor immediately.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ARCHITECTURE -->
+    <section id="architecture" class="section fade">
+      <div class="section-label">
+        <div class="section-bar"></div>
+        <span class="section-tag">02 / Architecture</span>
+      </div>
+      <h2>System Architecture</h2>
+      <p>Three-tier architecture: React frontend captures and streams frames, Flask backend processes them with MediaPipe, Decision Tree model returns fatigue prediction.</p>
+
+      <div class="arch">
+        <div class="arch-flow">
+          <div class="arch-block">
+            <div class="arch-box" style="border-top-color:var(--blue)">
+              <div class="arch-label" style="color:var(--blue)">Frontend</div>
+              <div class="arch-name">React + Vite</div>
+              <div class="arch-sub">Vercel</div>
+            </div>
+          </div>
+          <div class="arch-arrow">
+            <span>base64 frame</span>
+            <div class="arch-arrow-line"></div>
+            <span>POST /analyze-frame</span>
+          </div>
+          <div class="arch-block">
+            <div class="arch-box" style="border-top-color:var(--gold)">
+              <div class="arch-label" style="color:var(--gold)">Backend</div>
+              <div class="arch-name">Flask API</div>
+              <div class="arch-sub">Render (Docker)</div>
+            </div>
+          </div>
+          <div class="arch-arrow">
+            <span>RGB image</span>
+            <div class="arch-arrow-line"></div>
+            <span>detect()</span>
+          </div>
+          <div class="arch-block">
+            <div class="arch-box" style="border-top-color:var(--green)">
+              <div class="arch-label" style="color:var(--green)">Vision</div>
+              <div class="arch-name">MediaPipe</div>
+              <div class="arch-sub">478 landmarks</div>
+            </div>
+          </div>
+          <div class="arch-arrow">
+            <span>7 features</span>
+            <div class="arch-arrow-line"></div>
+            <span>predict()</span>
+          </div>
+          <div class="arch-block">
+            <div class="arch-box" style="border-top-color:var(--red)">
+              <div class="arch-label" style="color:var(--red)">ML Model</div>
+              <div class="arch-name">Decision Tree</div>
+              <div class="arch-sub">sklearn 1.6.1</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stack-grid">
+        <div class="stack-card">
+          <div class="stack-header" style="color:var(--blue)">Frontend Stack</div>
+          <div class="stack-row"><span class="stack-key">Framework</span><span class="stack-val">React 18 + Vite</span></div>
+          <div class="stack-row"><span class="stack-key">Routing</span><span class="stack-val">react-router v6</span></div>
+          <div class="stack-row"><span class="stack-key">Deployment</span><span class="stack-val">Vercel</span></div>
+          <div class="stack-row"><span class="stack-key">Styling</span><span class="stack-val">Inline CSS</span></div>
+          <div class="stack-row"><span class="stack-key">Fonts</span><span class="stack-val">Oswald + Barlow</span></div>
+        </div>
+        <div class="stack-card">
+          <div class="stack-header" style="color:var(--gold)">Backend Stack</div>
+          <div class="stack-row"><span class="stack-key">Framework</span><span class="stack-val">Flask 2.3.3</span></div>
+          <div class="stack-row"><span class="stack-key">WSGI Server</span><span class="stack-val">Gunicorn 21.2.0</span></div>
+          <div class="stack-row"><span class="stack-key">Deployment</span><span class="stack-val">Render (Docker)</span></div>
+          <div class="stack-row"><span class="stack-key">Python</span><span class="stack-val">3.9-slim</span></div>
+          <div class="stack-row"><span class="stack-key">CORS</span><span class="stack-val">flask-cors 4.0.0</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- API -->
+    <section id="api" class="section fade">
+      <div class="section-label">
+        <div class="section-bar"></div>
+        <span class="section-tag">03 / API Reference</span>
+      </div>
+      <h2>REST API</h2>
+      <p style="font-family:monospace;font-size:13px;color:var(--muted);margin-bottom:24px">Base URL: <span style="color:var(--gold)">https://fatigue-backend-pijd.onrender.com</span></p>
+
+      <!-- GET / -->
+      <div class="endpoint">
+        <div class="endpoint-header">
+          <span class="method method-get">GET</span>
+          <span class="endpoint-path">/</span>
+          <span class="endpoint-desc">Health check · wake server</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="code-label">Response</div>
+          <div class="code-block"><span class="s">"Fatigue Detection API Running"</span></div>
+        </div>
+      </div>
+
+      <!-- POST /analyze-frame -->
+      <div class="endpoint">
+        <div class="endpoint-header">
+          <span class="method method-post">POST</span>
+          <span class="endpoint-path">/analyze-frame</span>
+          <span class="endpoint-desc">Analyze a single webcam frame</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="code-grid">
+            <div>
+              <div class="code-label">Request Body</div>
+              <div class="code-block">{<br>&nbsp;&nbsp;<span class="s">"image"</span>: <span class="n">"&lt;base64 JPEG&gt;"</span><br>}</div>
+            </div>
+            <div>
+              <div class="code-label">Response</div>
+              <div class="code-block">{<br>&nbsp;&nbsp;<span class="s">"face_detected"</span>: <span class="b">true</span>,<br>&nbsp;&nbsp;<span class="s">"left_ear"</span>: <span class="n">0.312</span>,<br>&nbsp;&nbsp;<span class="s">"right_ear"</span>: <span class="n">0.298</span>,<br>&nbsp;&nbsp;<span class="s">"avg_ear"</span>: <span class="n">0.305</span>,<br>&nbsp;&nbsp;<span class="s">"eyes_closed"</span>: <span class="r">false</span>,<br>&nbsp;&nbsp;<span class="s">"pitch"</span>: <span class="n">-2.14</span>,<br>&nbsp;&nbsp;<span class="s">"yaw"</span>: <span class="n">1.08</span>,<br>&nbsp;&nbsp;<span class="s">"roll"</span>: <span class="n">0.93</span>,<br>&nbsp;&nbsp;<span class="s">"blink_score_left"</span>: <span class="n">0.031</span>,<br>&nbsp;&nbsp;<span class="s">"blink_score_right"</span>: <span class="n">0.027</span><br>}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- POST /predict-session -->
+      <div class="endpoint">
+        <div class="endpoint-header">
+          <span class="method method-post">POST</span>
+          <span class="endpoint-path">/predict-session</span>
+          <span class="endpoint-desc">Final fatigue prediction after session</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="code-grid">
+            <div>
+              <div class="code-label">Request Body</div>
+              <div class="code-block">{<br>&nbsp;&nbsp;<span class="s">"blink_rate"</span>: <span class="n">18.5</span>,<br>&nbsp;&nbsp;<span class="s">"eye_closure_time"</span>: <span class="n">0.42</span>,<br>&nbsp;&nbsp;<span class="s">"head_tilt_angle"</span>: <span class="n">3.21</span>,<br>&nbsp;&nbsp;<span class="s">"heart_rate"</span>: <span class="n">95</span>,<br>&nbsp;&nbsp;<span class="s">"shift_hours"</span>: <span class="n">5</span>,<br>&nbsp;&nbsp;<span class="s">"temperature"</span>: <span class="n">32</span>,<br>&nbsp;&nbsp;<span class="s">"gas_level"</span>: <span class="n">0.03</span><br>}</div>
+            </div>
+            <div>
+              <div class="code-label">Response</div>
+              <div class="code-block">{<br>&nbsp;&nbsp;<span class="s">"fatigue_level"</span>: <span class="s" style="color:var(--green)">"Normal"</span>,<br>&nbsp;&nbsp;<span class="s">"blink_rate"</span>: <span class="n">18.5</span>,<br>&nbsp;&nbsp;<span class="s">"eye_closure_time"</span>: <span class="n">0.42</span>,<br>&nbsp;&nbsp;<span class="s">"head_tilt_angle"</span>: <span class="n">3.21</span><br>}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- POST /predict -->
+      <div class="endpoint">
+        <div class="endpoint-header">
+          <span class="method method-post">POST</span>
+          <span class="endpoint-path">/predict</span>
+          <span class="endpoint-desc">Manual prediction (no vision)</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="code-grid">
+            <div>
+              <div class="code-label">Request Body</div>
+              <div class="code-block">{<br>&nbsp;&nbsp;<span class="s">"blink_rate"</span>: <span class="n">0</span>,<br>&nbsp;&nbsp;<span class="s">"eye_closure_time"</span>: <span class="n">0</span>,<br>&nbsp;&nbsp;<span class="s">"head_tilt_angle"</span>: <span class="n">0</span>,<br>&nbsp;&nbsp;<span class="s">"heart_rate"</span>: <span class="n">0</span>,<br>&nbsp;&nbsp;<span class="s">"shift_hours"</span>: <span class="n">0</span>,<br>&nbsp;&nbsp;<span class="s">"temperature"</span>: <span class="n">0</span>,<br>&nbsp;&nbsp;<span class="s">"gas_level"</span>: <span class="n">0</span><br>}</div>
+            </div>
+            <div>
+              <div class="code-label">Response</div>
+              <div class="code-block">{<br>&nbsp;&nbsp;<span class="s">"fatigue_level"</span>: <span class="s" style="color:var(--gold)">"Moderate"</span><br>}<br><br><span style="color:var(--muted)">// levels: "Normal"</span><br><span style="color:var(--muted)">// "Moderate" | "High"</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section id="features" class="section fade">
+      <div class="section-label">
+        <div class="section-bar"></div>
+        <span class="section-tag">04 / Features</span>
+      </div>
+      <h2>Key Features</h2>
+      <p>MineWatch combines real-time computer vision with environmental sensor fusion to give a complete picture of operator fatigue.</p>
+
+      <div class="features-grid">
+        <div class="feat">
+          <div class="feat-icon">👁</div>
+          <h3>EAR Detection</h3>
+          <p>Eye Aspect Ratio calculated from 6 MediaPipe landmarks per eye. EAR below 0.21 = eyes closed. Uses left + right average.</p>
+        </div>
+        <div class="feat">
+          <div class="feat-icon">🔁</div>
+          <h3>Blink Rate</h3>
+          <p>Counts blinks per minute using consecutive EAR drop detection. Requires 2+ consecutive closed frames to register a blink.</p>
+        </div>
+        <div class="feat">
+          <div class="feat-icon">📐</div>
+          <h3>Head Pose</h3>
+          <p>Pitch, yaw, roll extracted from 4×4 facial transformation matrix. Head tilt = average absolute roll across the session.</p>
+        </div>
+        <div class="feat">
+          <div class="feat-icon">⚡</div>
+          <h3>Reaction Test</h3>
+          <p>4-round colour-flash test. Ratings: Excellent &lt;200ms, Good &lt;300ms, Moderate &lt;400ms, Slow/Fatigued ≥400ms.</p>
+        </div>
+        <div class="feat">
+          <div class="feat-icon">🌡</div>
+          <h3>Sensor Fusion</h3>
+          <p>Combines vision data with heart rate, shift hours, pit temperature, and gas level for comprehensive fatigue scoring.</p>
+        </div>
+        <div class="feat">
+          <div class="feat-icon">🤖</div>
+          <h3>ML Classification</h3>
+          <p>Decision Tree Classifier trained on fatigue dataset. 7 input features, 3 output classes. Serialized with joblib.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SETUP -->
+    <section id="setup" class="section fade">
+      <div class="section-label">
+        <div class="section-bar"></div>
+        <span class="section-tag">05 / Setup</span>
+      </div>
+      <h2>Local Development</h2>
+      <p>Clone the repo, install dependencies, and run both services locally. Backend needs Python 3.9+, frontend needs Node 18+.</p>
+
+      <div class="setup-grid">
+        <div class="setup-card">
+          <div class="setup-header">
+            <div class="setup-dot" style="background:var(--gold)"></div>
+            <span class="setup-title" style="color:var(--gold)">Backend</span>
+          </div>
+          <div class="setup-code">
+            <div><span class="comment"># Go to backend folder</span></div>
+            <div><span class="cmd">cd</span> <span class="arg">backend/</span></div>
+            <div>&nbsp;</div>
+            <div><span class="comment"># Install dependencies</span></div>
+            <div><span class="cmd">pip</span> <span class="arg">install -r requirements.txt</span></div>
+            <div>&nbsp;</div>
+            <div><span class="comment"># Run dev server</span></div>
+            <div><span class="cmd">python</span> <span class="arg">app.py</span></div>
+            <div>&nbsp;</div>
+            <div><span class="comment"># Runs at http://localhost:5000</span></div>
+          </div>
+        </div>
+        <div class="setup-card">
+          <div class="setup-header">
+            <div class="setup-dot" style="background:var(--blue)"></div>
+            <span class="setup-title" style="color:var(--blue)">Frontend</span>
+          </div>
+          <div class="setup-code">
+            <div><span class="comment"># Install node packages</span></div>
+            <div><span class="cmd">npm</span> <span class="arg">install</span></div>
+            <div>&nbsp;</div>
+            <div><span class="comment"># Start dev server</span></div>
+            <div><span class="cmd">npm</span> <span class="arg">run dev</span></div>
+            <div>&nbsp;</div>
+            <div><span class="comment"># Production build</span></div>
+            <div><span class="cmd">npm</span> <span class="arg">run build</span></div>
+            <div>&nbsp;</div>
+            <div><span class="comment"># Deploy to Vercel via git push</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- requirements.txt -->
+      <div class="setup-card" style="margin-bottom:2px">
+        <div class="setup-header">
+          <span class="setup-title" style="color:var(--muted)">requirements.txt — exact versions</span>
+        </div>
+        <div class="req-grid">
+          <div><span class="req-name">Flask</span><span class="req-ver">==2.3.3</span></div>
+          <div><span class="req-name">numpy</span><span class="req-ver">==2.0.0</span></div>
+          <div><span class="req-name">flask-cors</span><span class="req-ver">==4.0.0</span></div>
+          <div><span class="req-name">opencv-python-headless</span><span class="req-ver">==4.8.1.78</span></div>
+          <div><span class="req-name">joblib</span><span class="req-ver">==1.3.2</span></div>
+          <div><span class="req-name">mediapipe</span><span class="req-ver">==0.10.8</span></div>
+          <div><span class="req-name">pandas</span><span class="req-ver">==2.2.2</span></div>
+          <div><span class="req-name">scikit-learn</span><span class="req-ver">==1.6.1</span></div>
+          <div><span class="req-name">gunicorn</span><span class="req-ver">==21.2.0</span></div>
+        </div>
+      </div>
+
+      <!-- vercel.json -->
+      <div class="setup-card">
+        <div class="setup-header">
+          <span class="setup-title" style="color:var(--muted)">vercel.json — required for react-router</span>
+        </div>
+        <div class="setup-code" style="padding:16px 20px">
+          <div style="color:var(--text)">{</div>
+          <div>&nbsp;&nbsp;<span style="color:var(--green)">"rewrites"</span>: [</div>
+          <div>&nbsp;&nbsp;&nbsp;&nbsp;{ <span style="color:var(--green)">"source"</span>: <span style="color:var(--gold)">"/(.*)"</span>, <span style="color:var(--green)">"destination"</span>: <span style="color:var(--gold)">"/"</span> }</div>
+          <div>&nbsp;&nbsp;]</div>
+          <div style="color:var(--text)">}</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ML MODEL -->
+    <section id="model" class="section fade">
+      <div class="section-label">
+        <div class="section-bar"></div>
+        <span class="section-tag">06 / ML Model</span>
+      </div>
+      <h2>Machine Learning Model</h2>
+      <p>A Decision Tree classifier trained on a custom fatigue dataset. The model takes 7 features — 3 from computer vision and 4 from manual sensor input — and outputs one of three fatigue classes.</p>
+
+      <div class="model-grid">
+        <div class="stack-card">
+          <div class="stack-header" style="color:var(--gold)">Model Info</div>
+          <div class="stack-row"><span class="stack-key">Algorithm</span><span class="stack-val">Decision Tree Classifier</span></div>
+          <div class="stack-row"><span class="stack-key">Library</span><span class="stack-val">scikit-learn 1.6.1</span></div>
+          <div class="stack-row"><span class="stack-key">Output classes</span><span class="stack-val">3 (Normal / Moderate / High)</span></div>
+          <div class="stack-row"><span class="stack-key">Saved as</span><span class="stack-val">fatigue_model.pkl</span></div>
+          <div class="stack-row"><span class="stack-key">Serializer</span><span class="stack-val">joblib 1.3.2</span></div>
+          <div class="stack-row"><span class="stack-key">Numpy compat</span><span class="stack-val">2.0.0 (numpy._core)</span></div>
+        </div>
+        <div class="stack-card">
+          <div class="stack-header" style="color:var(--blue)">Input Features (7)</div>
+          <div class="feat-row">
+            <div class="feat-dot" style="background:var(--green)"></div>
+            <span class="feat-name">blink_rate</span>
+            <span class="feat-unit">blinks / min</span>
+          </div>
+          <div class="feat-row">
+            <div class="feat-dot" style="background:var(--green)"></div>
+            <span class="feat-name">eye_closure_time</span>
+            <span class="feat-unit">seconds</span>
+          </div>
+          <div class="feat-row">
+            <div class="feat-dot" style="background:var(--green)"></div>
+            <span class="feat-name">head_tilt_angle</span>
+            <span class="feat-unit">degrees</span>
+          </div>
+          <div class="feat-row">
+            <div class="feat-dot" style="background:var(--gold)"></div>
+            <span class="feat-name">heart_rate</span>
+            <span class="feat-unit">bpm</span>
+          </div>
+          <div class="feat-row">
+            <div class="feat-dot" style="background:var(--gold)"></div>
+            <span class="feat-name">shift_hours</span>
+            <span class="feat-unit">hours</span>
+          </div>
+          <div class="feat-row">
+            <div class="feat-dot" style="background:var(--red)"></div>
+            <span class="feat-name">temperature</span>
+            <span class="feat-unit">°C</span>
+          </div>
+          <div class="feat-row">
+            <div class="feat-dot" style="background:var(--red)"></div>
+            <span class="feat-name">gas_level</span>
+            <span class="feat-unit">ppm</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="classes">
+        <div class="cls" style="border-color:rgba(76,175,110,.25);background:rgba(76,175,110,.05)">
+          <div class="cls-num" style="color:var(--green)">0</div>
+          <div class="cls-name" style="color:var(--green)">Normal</div>
+        </div>
+        <div class="cls" style="border-color:rgba(245,166,35,.25);background:rgba(245,166,35,.05)">
+          <div class="cls-num" style="color:var(--gold)">1</div>
+          <div class="cls-name" style="color:var(--gold)">Moderate</div>
+        </div>
+        <div class="cls" style="border-color:rgba(255,68,68,.25);background:rgba(255,68,68,.05)">
+          <div class="cls-num" style="color:var(--red)">2</div>
+          <div class="cls-name" style="color:var(--red)">High Risk</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">
+    <div class="footer-hex"></div>
+    <span class="footer-name">Mine<span>Watch</span></span>
+  </div>
+  <span class="footer-stack">Flask · MediaPipe · React · scikit-learn · Render · Vercel</span>
+  <span class="footer-stack">© 2026 MineWatch</span>
+</footer>
+
+<script>
+  // Active sidebar link on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const links = document.querySelectorAll('.sidebar a');
+  window.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(s => {
+      if (window.scrollY >= s.offsetTop - 80) current = s.id;
+    });
+    links.forEach(a => {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+    });
+  });
+</script>
+</body>
+</html>
