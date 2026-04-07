@@ -11,8 +11,13 @@ import urllib.request
 import os
 import math
 import base64
+import time
+
+# Add this near the top, after app = Flask(__name__)
+
 
 app = Flask(__name__)
+START_TIME = time.time()
 CORS(app)  # must be right after app = Flask(__name__)
 
 # ----------------------------
@@ -152,7 +157,18 @@ def analyze_frame_route():
         "blink_score_left":  round(blink_left,  3),
         "blink_score_right": round(blink_right, 3),
     })
-
+@app.route("/uptime")
+def uptime():
+    elapsed = time.time() - START_TIME
+    days    = int(elapsed // 86400)
+    hours   = int((elapsed % 86400) // 3600)
+    minutes = int((elapsed % 3600) // 60)
+    seconds = int(elapsed % 60)
+    return jsonify({
+        "uptime_seconds": round(elapsed, 2),
+        "uptime_human":   f"{days}d {hours}h {minutes}m {seconds}s",
+        "started_at":     time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(START_TIME))
+    })
 
 # ----------------------------
 # NEW: Final prediction after React session ends
