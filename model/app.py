@@ -1,3 +1,8 @@
+import time
+import os
+import urllib.request
+import math
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import joblib
@@ -7,209 +12,129 @@ import numpy as np
 import mediapipe as mp
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision
-import urllib.request
-import os
-import math
-import base64
 
+# ── App setup ────────────────────────────────────────────────────────────────
 app = Flask(__name__)
-CORS(app)  # must be right after app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": [
+    "https://minewatch12.netlify.app",
+    "http://localhost:5173"
+]}})
 
-# ----------------------------
-# Load ML model
-# ----------------------------
-try:
-    model = joblib.load("fatigue_model.pkl")
-except FileNotFoundError:
-    raise Exception("fatigue_model.pkl not found.")
+START_TIME = time.time()
 
-# ----------------------------
-# Download MediaPipe Face Landmarker model
-# ----------------------------
-LANDMARK_MODEL_PATH = "face_landmarker.task"
-if not os.path.exists(LANDMARK_MODEL_PATH):
-    print("Downloading Face Landmarker model...")
-    urllib.request.urlretrieve(
-        "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-        LANDMARK_MODEL_PATH
-    )
-    print("Downloaded.")
+# ── MediaPipe face landmarker setup ──────────────────────────────────────────
+MODEL_URL  = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
+MODEL_PATH = "face_landmarker.task"
 
-# ----------------------------
-# Setup Face Landmarker
-# ----------------------------
-base_options = mp_python.BaseOptions(model_asset_path=LANDMARK_MODEL_PATH)
-landmarker_options = vision.FaceLandmarkerOptions(
+if not os.path.exists(MODEL_PATH):
+    print("Downloading face landmarker model…")
+    urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+    print("Model downloaded.")
+
+base_options    = mp_python.BaseOptions(model_asset_path=MODEL_PATH)
+face_options    = vision.FaceLandmarkerOptions(
     base_options=base_options,
     output_face_blendshapes=True,
     output_facial_transformation_matrixes=True,
     num_faces=1,
-    min_face_detection_confidence=0.5,
-    min_face_presence_confidence=0.5,
-    min_tracking_confidence=0.5
 )
-face_landmarker = vision.FaceLandmarker.create_from_options(landmarker_options)
+face_landmarker = vision.FaceLandmarker.create_from_options(face_options)
 
-# ----------------------------
-# Eye landmark indices
-# ----------------------------
+# ── ML model ─────────────────────────────────────────────────────────────────
+MODEL_FILE = "fatigue_model.pkl"
+clf        = joblib.load(MODEL_FILE) if os.path.exists(MODEL_FILE) else None
+
+# ── EAR helpers ──────────────────────────────────────────────────────────────
+# MediaPipe 478-landmark indices for left / right eye
 LEFT_EYE  = [362, 385, 387, 263, 373, 380]
 RIGHT_EYE = [33,  160, 158, 133, 153, 144]
 
-EAR_THRESHOLD    = 0.21
-BLINK_CONSEC_FRAMES = 2
+def _dist(a, b):
+    return math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)
 
-def compute_ear(landmarks, eye_indices, img_w, img_h):
-    pts = []
-    for idx in eye_indices:
-        lm = landmarks[idx]
-        pts.append((lm.x * img_w, lm.y * img_h))
-    A = math.dist(pts[1], pts[5])
-    B = math.dist(pts[2], pts[4])
-    C = math.dist(pts[0], pts[3])
-    return (A + B) / (2.0 * C)
+def eye_aspect_ratio(landmarks, indices):
+    p = [landmarks[i] for i in indices]
+    # vertical distances
+    v1 = _dist(p[1], p[5])
+    v2 = _dist(p[2], p[4])
+    # horizontal distance
+    h  = _dist(p[0], p[3])
+    return (v1 + v2) / (2.0 * h) if h > 0 else 0.0
 
-def compute_head_pose(transformation_matrix):
-    mat = np.array(transformation_matrix.data).reshape(4, 4)
-    R = mat[:3, :3]
-    sy = math.sqrt(R[0, 0] ** 2 + R[1, 0] ** 2)
-    singular = sy < 1e-6
-    if not singular:
-        pitch = math.degrees(math.atan2(R[2, 1], R[2, 2]))
-        yaw   = math.degrees(math.atan2(-R[2, 0], sy))
-        roll  = math.degrees(math.atan2(R[1, 0], R[0, 0]))
-    else:
-        pitch = math.degrees(math.atan2(-R[1, 2], R[1, 1]))
-        yaw   = math.degrees(math.atan2(-R[2, 0], sy))
-        roll  = 0
-    return pitch, yaw, roll
+# ── Routes ───────────────────────────────────────────────────────────────────
 
-def analyze_frame(frame):
-    h, w, _ = frame.shape
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-    results = face_landmarker.detect(mp_image)
-
-    if not results.face_landmarks:
-        return False, 0, 0, 0, 0, 0, 0, 0
-
-    landmarks = results.face_landmarks[0]
-    left_ear  = compute_ear(landmarks, LEFT_EYE,  w, h)
-    right_ear = compute_ear(landmarks, RIGHT_EYE, w, h)
-
-    blink_left  = 0
-    blink_right = 0
-    if results.face_blendshapes:
-        for bs in results.face_blendshapes[0]:
-            if bs.category_name == "eyeBlinkLeft":
-                blink_left = bs.score
-            elif bs.category_name == "eyeBlinkRight":
-                blink_right = bs.score
-
-    pitch, yaw, roll = 0, 0, 0
-    if results.facial_transformation_matrixes:
-        pitch, yaw, roll = compute_head_pose(results.facial_transformation_matrixes[0])
-
-    return True, left_ear, right_ear, pitch, yaw, roll, blink_left, blink_right
+@app.route("/uptime")
+def uptime():
+    elapsed = time.time() - START_TIME
+    return jsonify({
+        "uptime_seconds": round(elapsed, 2),
+        "uptime_human":   f"{int(elapsed // 3600)}h {int((elapsed % 3600) // 60)}m",
+    })
 
 
-# ----------------------------
-# NEW: Analyze a single base64 frame from React browser webcam
-# ----------------------------
-@app.route("/analyze-frame", methods=["POST", "OPTIONS"])
-def analyze_frame_route():
-    if request.method == "OPTIONS":
-        return jsonify({}), 200
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"})
 
-    data = request.json
-    img_b64 = data.get("image", "")
 
+@app.route("/analyze", methods=["POST"])
+def analyze():
+    """
+    Expects a JSON body:
+    {
+        "image": "<base64-encoded JPEG/PNG string>"   // without data:image/... prefix
+    }
+    Returns EAR values, blink-related flags, and optionally an ML fatigue label.
+    """
+    data = request.get_json(force=True)
+    if not data or "image" not in data:
+        return jsonify({"error": "No image provided"}), 400
+
+    # Decode base64 → numpy array
     try:
-        img_bytes = base64.b64decode(img_b64)
-        np_arr = np.frombuffer(img_bytes, np.uint8)
-        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-    except Exception:
-        return jsonify({"error": "Invalid image"}), 400
+        img_bytes = np.frombuffer(
+            __import__("base64").b64decode(data["image"]), dtype=np.uint8
+        )
+        frame = cv2.imdecode(img_bytes, cv2.IMREAD_COLOR)
+        if frame is None:
+            raise ValueError("imdecode returned None")
+    except Exception as e:
+        return jsonify({"error": f"Image decode failed: {e}"}), 400
 
-    if frame is None:
-        return jsonify({"error": "Could not decode image"}), 400
+    # Convert BGR → RGB for MediaPipe
+    rgb      = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
 
-    (face_detected, left_ear, right_ear,
-     pitch, yaw, roll, blink_left, blink_right) = analyze_frame(frame)
+    result = face_landmarker.detect(mp_image)
 
-    avg_ear    = (left_ear + right_ear) / 2.0
-    eyes_closed = avg_ear < EAR_THRESHOLD and face_detected
+    if not result.face_landmarks:
+        return jsonify({"face_detected": False})
 
-    return jsonify({
-        "face_detected":     face_detected,
-        "left_ear":          round(left_ear,  3),
-        "right_ear":         round(right_ear, 3),
-        "avg_ear":           round(avg_ear,   3),
-        "eyes_closed":       eyes_closed,
-        "pitch":             round(pitch, 2),
-        "yaw":               round(yaw,   2),
-        "roll":              round(roll,  2),
-        "blink_score_left":  round(blink_left,  3),
-        "blink_score_right": round(blink_right, 3),
-    })
+    landmarks = result.face_landmarks[0]
+    left_ear  = eye_aspect_ratio(landmarks, LEFT_EYE)
+    right_ear = eye_aspect_ratio(landmarks, RIGHT_EYE)
+    avg_ear   = (left_ear + right_ear) / 2.0
 
+    response = {
+        "face_detected": True,
+        "left_ear":      round(left_ear,  4),
+        "right_ear":     round(right_ear, 4),
+        "avg_ear":       round(avg_ear,   4),
+    }
 
-# ----------------------------
-# NEW: Final prediction after React session ends
-# ----------------------------
-@app.route("/predict-session", methods=["POST", "OPTIONS"])
-def predict_session():
-    if request.method == "OPTIONS":
-        return jsonify({}), 200
+    # Optional ML prediction
+    if clf is not None:
+        try:
+            features = pd.DataFrame([[left_ear, right_ear, avg_ear]],
+                                    columns=["left_ear", "right_ear", "avg_ear"])
+            label    = clf.predict(features)[0]
+            response["fatigue_label"] = int(label)
+        except Exception as e:
+            response["ml_error"] = str(e)
 
-    data = request.json
-
-    sample = pd.DataFrame([{
-        "blink_rate":       data.get("blink_rate",       0),
-        "eye_closure_time": data.get("eye_closure_time", 0),
-        "head_tilt_angle":  data.get("head_tilt_angle",  0),
-        "heart_rate":       data.get("heart_rate",       95),
-        "shift_hours":      data.get("shift_hours",      5),
-        "temperature":      data.get("temperature",      32),
-        "gas_level":        data.get("gas_level",        0.03),
-    }])
-
-    prediction = model.predict(sample)
-    levels = ["Normal", "Moderate", "High"]
-    fatigue_level = levels[int(prediction[0])]
-
-    return jsonify({
-        "fatigue_level":    fatigue_level,
-        "blink_rate":       round(data.get("blink_rate", 0), 2),
-        "eye_closure_time": round(data.get("eye_closure_time", 0), 2),
-        "head_tilt_angle":  round(data.get("head_tilt_angle", 0), 2),
-    })
+    return jsonify(response)
 
 
-# ----------------------------
-# Original: Manual prediction route
-# ----------------------------
-@app.route("/predict", methods=["POST"])
-def predict():
-    data = request.json
-    sample = pd.DataFrame([{
-        "blink_rate":       data.get("blink_rate", 0),
-        "eye_closure_time": data.get("eye_closure_time", 0),
-        "head_tilt_angle":  data.get("head_tilt_angle", 0),
-        "heart_rate":       data.get("heart_rate", 0),
-        "shift_hours":      data.get("shift_hours", 0),
-        "temperature":      data.get("temperature", 0),
-        "gas_level":        data.get("gas_level", 0)
-    }])
-    prediction = model.predict(sample)
-    levels = ["Normal", "Moderate", "High"]
-    return jsonify({"fatigue_level": levels[int(prediction[0])]})
-
-
-@app.route("/")
-def home():
-    return "Fatigue Detection API Running"
-
-
+# ── Entry point ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    app.run(port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=False)

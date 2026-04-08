@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router";
 
-const API = "";
+const API = "https://fatigue-backend-pijd.onrender.com";
 const FRAME_INTERVAL_MS = 120;
 const SESSION_SECONDS   = 20;
 const EAR_CLOSED        = 0.21;
@@ -13,7 +13,6 @@ const LEVELS = {
   High:     { color: "#ff4444", icon: "▲", label: "HIGH RISK", action: "STOP — Report to supervisor", desc: "Dangerous fatigue. Do not operate machinery.",  pct: 100 },
 };
 
-// ── Countdown hook ───────────────────────────────────────────────────
 function useCountdown(target, active) {
   const [remaining, setRemaining] = useState(target);
   useEffect(() => {
@@ -24,7 +23,6 @@ function useCountdown(target, active) {
   return remaining;
 }
 
-// ── Pill metric ──────────────────────────────────────────────────────
 function Pill({ label, value, unit, color }) {
   return (
     <div style={{ background:"#0e0c0a", border:"1px solid #2a2520", padding:"12px 16px", display:"flex", flexDirection:"column", gap:4 }}>
@@ -37,7 +35,6 @@ function Pill({ label, value, unit, color }) {
   );
 }
 
-// ── EAR bar ──────────────────────────────────────────────────────────
 function EARBar({ ear }) {
   const pct = Math.min(1, ear / 0.4) * 100;
   const col = ear < EAR_CLOSED ? "#ff4444" : "#4caf6e";
@@ -52,7 +49,6 @@ function EARBar({ ear }) {
   );
 }
 
-// ── Result card ──────────────────────────────────────────────────────
 function ResultCard({ result, onReset }) {
   const cfg    = LEVELS[result.fatigue_level] || LEVELS.Normal;
   const isHigh = result.fatigue_level === "High";
@@ -96,7 +92,6 @@ function ResultCard({ result, onReset }) {
   );
 }
 
-// ── Sensor panel ─────────────────────────────────────────────────────
 function SensorPanel({ sensors, setSensors }) {
   const fields = [
     { key:"heart_rate",  label:"Heart Rate", unit:"bpm",  step:1     },
@@ -121,26 +116,24 @@ function SensorPanel({ sensors, setSensors }) {
   );
 }
 
-// ── Video display ────────────────────────────────────────────────────
-function VideoDisplay({ videoRef }) {
+// Fixed: accepts srcObject as prop so useEffect has a real dependency
+function VideoDisplay({ srcObject }) {
   const displayRef = useRef(null);
   useEffect(() => {
     const display = displayRef.current;
-    const source  = videoRef.current;
-    if (display && source && source.srcObject) {
-      display.srcObject = source.srcObject;
+    if (display && srcObject) {
+      display.srcObject = srcObject;
       display.play().catch(() => {});
     }
-  }, [videoRef]);
+  }, [srcObject]);
   return <video ref={displayRef} muted playsInline autoPlay style={{ width:"100%", display:"block", transform:"scaleX(-1)" }}/>;
 }
 
-// ── Reaction Time Modal ──────────────────────────────────────────────
 const REACTION_ROUNDS = 4;
-const COLORS = ["#f5a623", "#4caf6e", "#ff4444", "#4a9eff"];
+const REACTION_COLORS = ["#f5a623", "#4caf6e", "#ff4444", "#4a9eff"];
 
 function ReactionModal({ onClose }) {
-  const [stage, setStage]     = useState("intro");   // intro | waiting | ready | clicked | done
+  const [stage, setStage]     = useState("intro");
   const [round, setRound]     = useState(0);
   const [times, setTimes]     = useState([]);
   const [color, setColor]     = useState("#1a1815");
@@ -155,7 +148,7 @@ function ReactionModal({ onClose }) {
     setStage("waiting");
     const delay = 1500 + Math.random() * 2500;
     timerRef.current = setTimeout(() => {
-      const c = COLORS[Math.floor(Math.random() * COLORS.length)];
+      const c = REACTION_COLORS[Math.floor(Math.random() * REACTION_COLORS.length)];
       setColor(c);
       setStartTs(Date.now());
       setStage("ready");
@@ -174,10 +167,7 @@ function ReactionModal({ onClose }) {
       setLast(ms);
       setTimes(prev => {
         const next = [...prev, ms];
-        if (next.length >= REACTION_ROUNDS) {
-          setStage("done");
-          return next;
-        }
+        if (next.length >= REACTION_ROUNDS) { setStage("done"); return next; }
         return next;
       });
       setRound(r => r + 1);
@@ -186,11 +176,10 @@ function ReactionModal({ onClose }) {
   }, [stage, startTs]);
 
   const avg = times.length ? Math.round(times.reduce((a,b)=>a+b,0)/times.length) : null;
-
   const ratingLabel = (ms) => {
-    if (ms < 200) return { text:"EXCELLENT", color:"#4caf6e" };
-    if (ms < 300) return { text:"GOOD",      color:"#f5a623" };
-    if (ms < 400) return { text:"MODERATE",  color:"#f5a623" };
+    if (ms < 200) return { text:"EXCELLENT",          color:"#4caf6e" };
+    if (ms < 300) return { text:"GOOD",               color:"#f5a623" };
+    if (ms < 400) return { text:"MODERATE",           color:"#f5a623" };
     return              { text:"SLOW — FATIGUE RISK", color:"#ff4444" };
   };
 
@@ -207,54 +196,32 @@ function ReactionModal({ onClose }) {
         background:"#0e0c0a", border:"2px solid #2a2520", borderTop:"2px solid #f5a62366",
         padding:"28px 24px", position:"relative",
       }}>
-        {/* Close */}
-        <button onClick={onClose} style={{
-          position:"absolute", top:12, right:16, background:"none", border:"none",
-          color:"#3a3530", fontSize:18, cursor:"pointer", fontFamily:"monospace",
-        }}>✕</button>
-
-        {/* Title */}
+        <button onClick={onClose} style={{ position:"absolute", top:12, right:16, background:"none", border:"none", color:"#3a3530", fontSize:18, cursor:"pointer", fontFamily:"monospace" }}>✕</button>
         <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:20 }}>
           <div style={{ width:8, height:8, background:"#f5a623", borderRadius:"50%" }}/>
-          <span style={{ fontFamily:"'Oswald'", fontSize:13, letterSpacing:3, color:"#f5a623", textTransform:"uppercase" }}>
-            Reaction Time Test
-          </span>
+          <span style={{ fontFamily:"'Oswald'", fontSize:13, letterSpacing:3, color:"#f5a623", textTransform:"uppercase" }}>Reaction Time Test</span>
         </div>
 
-        {/* INTRO */}
         {stage === "intro" && (
           <div style={{ textAlign:"center" }}>
             <p style={{ fontSize:13, color:"#5a5550", lineHeight:1.9, marginBottom:8 }}>
               A colour will appear after a random delay.<br/>
               <strong style={{ color:"#c8c0b0" }}>Click as fast as you can</strong> when you see it.
             </p>
-            <p style={{ fontSize:11, color:"#3a3530", fontFamily:"monospace", marginBottom:24 }}>
-              {REACTION_ROUNDS} rounds · Average score displayed at end
-            </p>
-            <button onClick={() => { setRound(0); setTimes([]); startRound(); }} style={{
-              padding:"13px 40px", background:"#f5a623", border:"none",
-              color:"#0e0c0a", fontSize:11, letterSpacing:4, textTransform:"uppercase",
-              fontFamily:"'Oswald'", fontWeight:700, cursor:"pointer",
-            }}>▶ Start Test</button>
+            <p style={{ fontSize:11, color:"#3a3530", fontFamily:"monospace", marginBottom:24 }}>{REACTION_ROUNDS} rounds · Average score displayed at end</p>
+            <button onClick={() => { setRound(0); setTimes([]); startRound(); }} style={{ padding:"13px 40px", background:"#f5a623", border:"none", color:"#0e0c0a", fontSize:11, letterSpacing:4, textTransform:"uppercase", fontFamily:"'Oswald'", fontWeight:700, cursor:"pointer" }}>▶ Start Test</button>
           </div>
         )}
 
-        {/* ACTIVE */}
         {(stage === "waiting" || stage === "ready") && (
-          <div onClick={handleClick} style={{
-            height:200, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
-            background: color, border:"2px solid #2a2520",
-            cursor:"pointer", transition:"background 0.15s", userSelect:"none",
-          }}>
-            <span style={{ fontFamily:"'Oswald'", fontSize:14, letterSpacing:3, textTransform:"uppercase",
-              color: stage === "ready" ? "#0e0c0a" : "#3a3530" }}>
+          <div onClick={handleClick} style={{ height:200, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", background:color, border:"2px solid #2a2520", cursor:"pointer", transition:"background 0.15s", userSelect:"none" }}>
+            <span style={{ fontFamily:"'Oswald'", fontSize:14, letterSpacing:3, textTransform:"uppercase", color: stage === "ready" ? "#0e0c0a" : "#3a3530" }}>
               {stage === "waiting" ? "Wait for colour..." : "CLICK NOW!"}
             </span>
             {stage === "waiting" && <span style={{ fontSize:11, color:"#3a3530", fontFamily:"monospace", marginTop:8 }}>Round {round + 1} / {REACTION_ROUNDS}</span>}
           </div>
         )}
 
-        {/* RESULT of one round */}
         {stage === "clicked" && (
           <div style={{ textAlign:"center" }}>
             {early ? (
@@ -268,30 +235,17 @@ function ReactionModal({ onClose }) {
                 <div style={{ fontSize:11, color:"#3a3530", fontFamily:"monospace", marginBottom:20 }}>Round {times.length} / {REACTION_ROUNDS}</div>
               </>
             )}
-            <button onClick={() => { if (early) { startRound(); } else if (times.length < REACTION_ROUNDS) { startRound(); } else { setStage("done"); } }} style={{
-              padding:"12px 32px", background:"#f5a623", border:"none",
-              color:"#0e0c0a", fontSize:11, letterSpacing:3, textTransform:"uppercase",
-              fontFamily:"'Oswald'", fontWeight:700, cursor:"pointer",
-            }}>{times.length >= REACTION_ROUNDS ? "See Results" : "Next Round →"}</button>
+            <button onClick={() => { if (early || times.length < REACTION_ROUNDS) { startRound(); } else { setStage("done"); } }} style={{ padding:"12px 32px", background:"#f5a623", border:"none", color:"#0e0c0a", fontSize:11, letterSpacing:3, textTransform:"uppercase", fontFamily:"'Oswald'", fontWeight:700, cursor:"pointer" }}>
+              {times.length >= REACTION_ROUNDS ? "See Results" : "Next Round →"}
+            </button>
           </div>
         )}
 
-        {/* FINAL */}
         {stage === "done" && avg !== null && (
           <div style={{ textAlign:"center" }}>
             <div style={{ fontSize:10, letterSpacing:4, color:"#3a3530", fontFamily:"monospace", textTransform:"uppercase", marginBottom:8 }}>Average Reaction Time</div>
-            <div style={{ fontSize:56, fontFamily:"'Oswald'", fontWeight:700, color: ratingLabel(avg).color, letterSpacing:2 }}>
-              {avg}<span style={{ fontSize:18 }}>ms</span>
-            </div>
-            <div style={{
-              display:"inline-block", marginTop:8, marginBottom:20,
-              padding:"4px 16px", border:`1px solid ${ratingLabel(avg).color}44`,
-              background:`${ratingLabel(avg).color}11`,
-              fontFamily:"'Oswald'", fontSize:13, letterSpacing:3,
-              color:ratingLabel(avg).color, textTransform:"uppercase",
-            }}>{ratingLabel(avg).text}</div>
-
-            {/* Per-round */}
+            <div style={{ fontSize:56, fontFamily:"'Oswald'", fontWeight:700, color:ratingLabel(avg).color, letterSpacing:2 }}>{avg}<span style={{ fontSize:18 }}>ms</span></div>
+            <div style={{ display:"inline-block", marginTop:8, marginBottom:20, padding:"4px 16px", border:`1px solid ${ratingLabel(avg).color}44`, background:`${ratingLabel(avg).color}11`, fontFamily:"'Oswald'", fontSize:13, letterSpacing:3, color:ratingLabel(avg).color, textTransform:"uppercase" }}>{ratingLabel(avg).text}</div>
             <div style={{ display:"grid", gridTemplateColumns:`repeat(${REACTION_ROUNDS},1fr)`, gap:2, marginBottom:20 }}>
               {times.map((t, i) => (
                 <div key={i} style={{ background:"#0b0908", border:"1px solid #1e1c18", padding:"8px 4px", textAlign:"center" }}>
@@ -300,21 +254,12 @@ function ReactionModal({ onClose }) {
                 </div>
               ))}
             </div>
-
             <div style={{ display:"flex", gap:2 }}>
-              <button onClick={() => { setRound(0); setTimes([]); setLast(null); startRound(); }} style={{
-                flex:1, padding:"12px 0", background:"transparent", border:"1px solid #2a2520",
-                color:"#4a4540", fontSize:10, letterSpacing:3, textTransform:"uppercase",
-                fontFamily:"'Oswald'", cursor:"pointer", transition:"all 0.2s",
-              }}
+              <button onClick={() => { setRound(0); setTimes([]); setLast(null); startRound(); }} style={{ flex:1, padding:"12px 0", background:"transparent", border:"1px solid #2a2520", color:"#4a4540", fontSize:10, letterSpacing:3, textTransform:"uppercase", fontFamily:"'Oswald'", cursor:"pointer", transition:"all 0.2s" }}
                 onMouseEnter={e=>{ e.target.style.borderColor="#5a5550"; e.target.style.color="#c8c0b0"; }}
                 onMouseLeave={e=>{ e.target.style.borderColor="#2a2520"; e.target.style.color="#4a4540"; }}
               >↺ Retry</button>
-              <button onClick={onClose} style={{
-                flex:1, padding:"12px 0", background:"#f5a623", border:"none",
-                color:"#0e0c0a", fontSize:10, letterSpacing:3, textTransform:"uppercase",
-                fontFamily:"'Oswald'", fontWeight:700, cursor:"pointer",
-              }}>Done</button>
+              <button onClick={onClose} style={{ flex:1, padding:"12px 0", background:"#f5a623", border:"none", color:"#0e0c0a", fontSize:10, letterSpacing:3, textTransform:"uppercase", fontFamily:"'Oswald'", fontWeight:700, cursor:"pointer" }}>Done</button>
             </div>
           </div>
         )}
@@ -323,27 +268,40 @@ function ReactionModal({ onClose }) {
   );
 }
 
-// ── Main Detect component ────────────────────────────────────────────
 export default function Detect() {
-  const navigate    = useNavigate();
-  const videoRef    = useRef(null);
-  const canvasRef   = useRef(null);
-  const intervalRef = useRef(null);
-  const streamRef   = useRef(null);
-  const sessionRef  = useRef({ frames:0, closedFrames:0, consecClosed:0, blinks:0, rolls:[], startTs:0 });
+  const navigate     = useNavigate();
+  const videoRef     = useRef(null);
+  const canvasRef    = useRef(null);
+  const intervalRef  = useRef(null);
+  const streamRef    = useRef(null);
+  const cancelledRef = useRef(false);  // guards setTimeout after stopEarly/reset
+  const sessionRef   = useRef({ frames:0, closedFrames:0, consecClosed:0, blinks:0, rolls:[], startTs:0 });
 
-  const [phase,       setPhase]   = useState("idle");
-  const [liveStats,   setLive]    = useState(null);
-  const [result,      setResult]  = useState(null);
-  const [errorMsg,    setError]   = useState("");
-  const [sensors,     setSensors] = useState({ heart_rate:"95", shift_hours:"5", temperature:"32", gas_level:"0.03" });
-  const [showReaction,setShowR]   = useState(false);
+  const [phase,        setPhase]   = useState("idle");
+  const [liveStats,    setLive]    = useState(null);
+  const [result,       setResult]  = useState(null);
+  const [errorMsg,     setError]   = useState("");
+  const [sensors,      setSensors] = useState({ heart_rate:"95", shift_hours:"5", temperature:"32", gas_level:"0.03" });
+  const [showReaction, setShowR]   = useState(false);
+  const [srcObject,    setSrcObject] = useState(null);  // for VideoDisplay re-render
+  const [waking,       setWaking]  = useState(false);
+  const [serverReady,  setServerReady] = useState(false);
 
   const remaining = useCountdown(SESSION_SECONDS, phase === "recording");
+
+  // Ping backend on mount to wake Render free instance
+  useEffect(() => {
+    setWaking(true);
+    fetch(`${API}/`)
+      .then(() => setServerReady(true))
+      .catch(() => setServerReady(true))
+      .finally(() => setWaking(false));
+  }, []);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current)  { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
     if (intervalRef.current){ clearInterval(intervalRef.current); intervalRef.current = null; }
+    setSrcObject(null);
   }, []);
 
   const startCamera = useCallback(async () => {
@@ -353,6 +311,7 @@ export default function Detect() {
       streamRef.current = stream;
       const video = videoRef.current;
       video.srcObject = stream;
+      setSrcObject(stream);
       await new Promise(resolve => { video.onloadedmetadata = () => video.play().then(resolve); });
       setPhase("ready");
     } catch(e) {
@@ -369,7 +328,11 @@ export default function Detect() {
     ctx.drawImage(video, 0, 0);
     const b64 = canvas.toDataURL("image/jpeg", 0.7).split(",")[1];
     try {
-      const res  = await fetch(`${API}/analyze-frame`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ image: b64 }) });
+      const res  = await fetch(`${API}/analyze-frame`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: b64 }),
+      });
       const data = await res.json();
       if (data.error) return;
       setLive(data);
@@ -378,11 +341,11 @@ export default function Detect() {
       if (data.eyes_closed) { s.consecClosed++; s.closedFrames++; }
       else { if (s.consecClosed >= BLINK_CONSEC) s.blinks++; s.consecClosed = 0; }
       if (data.face_detected) s.rolls.push(Math.abs(data.roll));
-    } catch { /* skip */ }
+    } catch { /* skip frame on network blip */ }
   }, []);
 
-  // stop mid-session
   const stopEarly = useCallback(() => {
+    cancelledRef.current = true;
     stopCamera();
     setPhase("idle");
     setLive(null);
@@ -390,6 +353,7 @@ export default function Detect() {
   }, [stopCamera]);
 
   const startRecording = useCallback(() => {
+    cancelledRef.current = false;
     sessionRef.current = { frames:0, closedFrames:0, consecClosed:0, blinks:0, rolls:[], startTs:Date.now() };
     setPhase("recording");
     const begin = () => { intervalRef.current = setInterval(sendFrame, FRAME_INTERVAL_MS); };
@@ -398,8 +362,7 @@ export default function Detect() {
     else video.addEventListener("canplay", begin, { once: true });
 
     setTimeout(async () => {
-      // check if still recording (user may have stopped early)
-      if (!intervalRef.current && sessionRef.current.frames === 0) return;
+      if (cancelledRef.current) return;  // session was stopped early — do nothing
       clearInterval(intervalRef.current); intervalRef.current = null;
       setPhase("analyzing");
       const s       = sessionRef.current;
@@ -410,7 +373,8 @@ export default function Detect() {
       const head_tilt_angle  = s.rolls.length ? s.rolls.reduce((a,b)=>a+b,0)/s.rolls.length : 0;
       try {
         const res  = await fetch(`${API}/predict-session`, {
-          method:"POST", headers:{"Content-Type":"application/json"},
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             blink_rate:+blink_rate.toFixed(2), eye_closure_time:+eye_closure_time.toFixed(2),
             head_tilt_angle:+head_tilt_angle.toFixed(2), heart_rate:+sensors.heart_rate,
@@ -426,7 +390,12 @@ export default function Detect() {
     }, SESSION_SECONDS * 1000);
   }, [sendFrame, sensors, stopCamera]);
 
-  const reset = useCallback(() => { stopCamera(); setPhase("idle"); setLive(null); setResult(null); setError(""); }, [stopCamera]);
+  const reset = useCallback(() => {
+    cancelledRef.current = true;
+    stopCamera();
+    setPhase("idle"); setLive(null); setResult(null); setError("");
+  }, [stopCamera]);
+
   useEffect(() => () => stopCamera(), [stopCamera]);
 
   const isRecording = phase === "recording";
@@ -442,188 +411,123 @@ export default function Detect() {
         @keyframes fadeUp    { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
         @keyframes warnblink { 0%,100%{opacity:1} 50%{opacity:0.2} }
         @keyframes spin      { to{transform:rotate(360deg)} }
-        @keyframes scanline  { 0%{top:-4px} 100%{top:100%} }
         input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; }
         ::-webkit-scrollbar { width:4px; }
         ::-webkit-scrollbar-thumb { background:#1e1c18; border-radius:2px; }
       `}</style>
 
-      {/* Hidden video + canvas */}
       <video ref={videoRef} muted playsInline autoPlay style={{ display:"none", position:"absolute" }}/>
       <canvas ref={canvasRef} style={{ display:"none" }}/>
 
-      {/* Reaction modal */}
       {showReaction && <ReactionModal onClose={() => setShowR(false)}/>}
 
-      {/* ── NAVBAR (Home button only) ── */}
-      <nav style={{
-        position:"fixed", top:0, left:0, right:0, zIndex:100,
-        height:56, display:"flex", alignItems:"center", justifyContent:"space-between",
-        padding:"0 32px", background:"rgba(14,12,10,0.95)",
-        backdropFilter:"blur(10px)", borderBottom:"2px solid #1e1c18",
-      }}>
+      <nav style={{ position:"fixed", top:0, left:0, right:0, zIndex:100, height:56, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 32px", background:"rgba(14,12,10,0.95)", backdropFilter:"blur(10px)", borderBottom:"2px solid #1e1c18" }}>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <div style={{ width:24, height:24, background:"#f5a623",
-            clipPath:"polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)",
-            animation:"warnblink 3s infinite" }}/>
+          <div style={{ width:24, height:24, background:"#f5a623", clipPath:"polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)", animation:"warnblink 3s infinite" }}/>
           <span style={{ fontFamily:"'Oswald'", fontSize:18, fontWeight:700, letterSpacing:3, color:"#e8e0d0" }}>
             Mine<span style={{ color:"#f5a623" }}>Watch</span>
           </span>
-          <span style={{ marginLeft:6, padding:"2px 8px", fontSize:9, letterSpacing:2,
-            color:"#f5a623", border:"1px solid rgba(245,166,35,0.3)",
-            fontFamily:"monospace", textTransform:"uppercase" }}>FATIGUE SCAN</span>
+          <span style={{ marginLeft:6, padding:"2px 8px", fontSize:9, letterSpacing:2, color:"#f5a623", border:"1px solid rgba(245,166,35,0.3)", fontFamily:"monospace", textTransform:"uppercase" }}>FATIGUE SCAN</span>
         </div>
-
-        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-          {/* Home button only */}
-          <button onClick={() => navigate("/")} style={{
-            background:"transparent", border:"1px solid #2a2520",
-            color:"#4a4540", padding:"6px 18px", fontSize:10, letterSpacing:2,
-            fontFamily:"'Oswald'", textTransform:"uppercase", cursor:"pointer", transition:"all 0.2s",
-          }}
+        <div style={{ display:"flex", gap:12, alignItems:"center" }}>
+          <span style={{ fontSize:9, fontFamily:"monospace", letterSpacing:2, color: waking ? "#f5a623" : serverReady ? "#4caf6e" : "#3a3530" }}>
+            {waking ? "⟳ WAKING SERVER..." : serverReady ? "● SERVER READY" : ""}
+          </span>
+          <button onClick={() => navigate("/")} style={{ background:"transparent", border:"1px solid #2a2520", color:"#4a4540", padding:"6px 18px", fontSize:10, letterSpacing:2, fontFamily:"'Oswald'", textTransform:"uppercase", cursor:"pointer", transition:"all 0.2s" }}
             onMouseEnter={e=>{ e.target.style.borderColor="#5a5550"; e.target.style.color="#c8c0b0"; }}
             onMouseLeave={e=>{ e.target.style.borderColor="#2a2520"; e.target.style.color="#4a4540"; }}
           >← Home</button>
         </div>
       </nav>
 
-      {/* ── MAIN CONTENT ── */}
-      <div style={{ position:"relative", zIndex:1, minHeight:"100vh",
-        display:"flex", flexDirection:"column", alignItems:"center", padding:"80px 16px 60px" }}>
+      <div style={{ position:"relative", zIndex:1, minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", padding:"80px 16px 60px" }}>
 
-        {/* Reaction test button (always visible, above the camera/sensor panel) */}
         <div style={{ width:"100%", maxWidth:660, marginBottom:16, display:"flex", justifyContent:"flex-end" }}>
-          <button onClick={() => setShowR(true)} style={{
-            background:"transparent", border:"1px solid #f5a62344",
-            color:"#f5a623", padding:"8px 20px", fontSize:10, letterSpacing:2,
-            fontFamily:"'Oswald'", textTransform:"uppercase", cursor:"pointer", transition:"all 0.2s",
-          }}
+          <button onClick={() => setShowR(true)} style={{ background:"transparent", border:"1px solid #f5a62344", color:"#f5a623", padding:"8px 20px", fontSize:10, letterSpacing:2, fontFamily:"'Oswald'", textTransform:"uppercase", cursor:"pointer", transition:"all 0.2s" }}
             onMouseEnter={e=>{ e.target.style.borderColor="#f5a623"; e.target.style.background="rgba(245,166,35,0.08)"; }}
             onMouseLeave={e=>{ e.target.style.borderColor="#f5a62344"; e.target.style.background="transparent"; }}
           >⚡ Reaction Test</button>
         </div>
 
-        {/* ── IDLE ── */}
         {phase === "idle" && (
           <div style={{ width:"100%", maxWidth:500, animation:"fadeUp 0.4s ease" }}>
             <div style={{ background:"#0b0908", border:"2px solid #1e1c18", borderTop:"2px solid #f5a62344" }}>
               <div style={{ padding:"12px 20px", borderBottom:"1px solid #1e1c18", display:"flex", alignItems:"center", gap:8 }}>
                 <div style={{ width:8, height:8, background:"#f5a623", borderRadius:"50%" }}/>
-                <span style={{ fontSize:10, letterSpacing:3, color:"#f5a623", fontFamily:"monospace", textTransform:"uppercase" }}>
-                  Step 1 — Enter Shift Data
-                </span>
+                <span style={{ fontSize:10, letterSpacing:3, color:"#f5a623", fontFamily:"monospace", textTransform:"uppercase" }}>Step 1 — Enter Shift Data</span>
               </div>
               <div style={{ padding:"20px" }}>
                 <SensorPanel sensors={sensors} setSensors={setSensors}/>
-                <button onClick={startCamera} style={{
-                  width:"100%", padding:"14px 0", background:"#f5a623", border:"none",
-                  color:"#0e0c0a", fontSize:11, letterSpacing:4, textTransform:"uppercase",
-                  fontFamily:"'Oswald'", fontWeight:700, cursor:"pointer", transition:"all 0.2s",
-                }}
-                  onMouseEnter={e=>e.target.style.background="#ffba4a"}
-                  onMouseLeave={e=>e.target.style.background="#f5a623"}
-                >▶ Enable Camera</button>
+                <button onClick={startCamera} disabled={waking} style={{ width:"100%", padding:"14px 0", background: waking ? "#3a3020" : "#f5a623", border:"none", color:"#0e0c0a", fontSize:11, letterSpacing:4, textTransform:"uppercase", fontFamily:"'Oswald'", fontWeight:700, cursor: waking ? "not-allowed" : "pointer", transition:"all 0.2s" }}
+                  onMouseEnter={e=>{ if (!waking) e.target.style.background="#ffba4a"; }}
+                  onMouseLeave={e=>{ if (!waking) e.target.style.background="#f5a623"; }}
+                >{waking ? "⟳ Waking Server..." : "▶ Enable Camera"}</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* ── VIDEO PHASES ── */}
         {showVideo && (
           <div style={{ width:"100%", maxWidth:660, animation:"fadeUp 0.4s ease", display:"flex", flexDirection:"column", gap:2 }}>
-            <div style={{
-              position:"relative", overflow:"hidden",
-              border:`2px solid ${isRecording ? "#f5a62355" : "#1e1c18"}`,
-              boxShadow: isRecording ? "0 0 30px rgba(245,166,35,0.1)" : "none",
-              transition:"border-color 0.3s, box-shadow 0.3s",
-            }}>
-              <VideoDisplay videoRef={videoRef}/>
+            <div style={{ position:"relative", overflow:"hidden", border:`2px solid ${isRecording ? "#f5a62355" : "#1e1c18"}`, boxShadow: isRecording ? "0 0 30px rgba(245,166,35,0.1)" : "none", transition:"border-color 0.3s, box-shadow 0.3s" }}>
+              <VideoDisplay srcObject={srcObject}/>
 
               {isRecording && (
-                <div style={{ position:"absolute", top:12, left:12, display:"flex", alignItems:"center", gap:6,
-                  background:"rgba(0,0,0,0.75)", padding:"5px 12px", border:"1px solid rgba(245,166,35,0.3)" }}>
+                <div style={{ position:"absolute", top:12, left:12, display:"flex", alignItems:"center", gap:6, background:"rgba(0,0,0,0.75)", padding:"5px 12px", border:"1px solid rgba(245,166,35,0.3)" }}>
                   <span style={{ width:7, height:7, borderRadius:"50%", background:"#ff4444", display:"inline-block", animation:"warnblink 1s infinite" }}/>
                   <span style={{ fontSize:9, letterSpacing:3, color:"#ff6666", fontFamily:"monospace" }}>RECORDING</span>
                 </div>
               )}
-
               {isRecording && (
-                <div style={{ position:"absolute", top:12, right:12, background:"rgba(0,0,0,0.75)", padding:"5px 14px",
-                  border:"1px solid #2a2520", fontFamily:"'Oswald'", fontSize:20, color:"#f5a623", letterSpacing:2 }}>
-                  {remaining}s
-                </div>
+                <div style={{ position:"absolute", top:12, right:12, background:"rgba(0,0,0,0.75)", padding:"5px 14px", border:"1px solid #2a2520", fontFamily:"'Oswald'", fontSize:20, color:"#f5a623", letterSpacing:2 }}>{remaining}s</div>
               )}
-
               {isRecording && liveStats && (
                 <div style={{ position:"absolute", bottom:12, left:12, right:12, display:"flex", flexDirection:"column", gap:6 }}>
                   <EARBar ear={earValue}/>
                   <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
                     {["pitch","yaw","roll"].map(k => (
-                      <span key={k} style={{ fontSize:9, letterSpacing:2, color:"#6a6560", fontFamily:"monospace",
-                        background:"rgba(0,0,0,0.75)", padding:"3px 8px", border:"1px solid #2a2520" }}>
+                      <span key={k} style={{ fontSize:9, letterSpacing:2, color:"#6a6560", fontFamily:"monospace", background:"rgba(0,0,0,0.75)", padding:"3px 8px", border:"1px solid #2a2520" }}>
                         {k.toUpperCase()} {liveStats[k]?.toFixed(1)}°
                       </span>
                     ))}
-                    <span style={{ marginLeft:"auto", fontSize:9, letterSpacing:1, fontFamily:"monospace",
-                      background:"rgba(0,0,0,0.75)", padding:"3px 8px", border:"1px solid #2a2520",
-                      color: liveStats.face_detected ? "#4caf6e" : "#ff4444" }}>
+                    <span style={{ marginLeft:"auto", fontSize:9, letterSpacing:1, fontFamily:"monospace", background:"rgba(0,0,0,0.75)", padding:"3px 8px", border:"1px solid #2a2520", color: liveStats.face_detected ? "#4caf6e" : "#ff4444" }}>
                       {liveStats.face_detected ? "FACE ✓" : "NO FACE"}
                     </span>
                   </div>
                 </div>
               )}
-
               {phase === "analyzing" && (
-                <div style={{ position:"absolute", inset:0, background:"rgba(14,12,10,0.85)",
-                  display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:14 }}>
-                  <div style={{ width:40, height:40, border:"2px solid #2a2520", borderTop:"2px solid #f5a623",
-                    borderRadius:"50%", animation:"spin 0.8s linear infinite" }}/>
-                  <p style={{ fontSize:10, letterSpacing:4, color:"#4a4540", fontFamily:"monospace", textTransform:"uppercase" }}>
-                    Processing Data
-                  </p>
+                <div style={{ position:"absolute", inset:0, background:"rgba(14,12,10,0.85)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:14 }}>
+                  <div style={{ width:40, height:40, border:"2px solid #2a2520", borderTop:"2px solid #f5a623", borderRadius:"50%", animation:"spin 0.8s linear infinite" }}/>
+                  <p style={{ fontSize:10, letterSpacing:4, color:"#4a4540", fontFamily:"monospace", textTransform:"uppercase" }}>Processing Data</p>
                 </div>
               )}
             </div>
 
             {isRecording && liveStats && (
               <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:2 }}>
-                <Pill label="L-EAR"   value={liveStats.left_ear?.toFixed(3)}         color={liveStats.left_ear  < EAR_CLOSED ? "#ff4444" : "#4caf6e"}/>
-                <Pill label="R-EAR"   value={liveStats.right_ear?.toFixed(3)}        color={liveStats.right_ear < EAR_CLOSED ? "#ff4444" : "#4caf6e"}/>
-                <Pill label="Blink L" value={liveStats.blink_score_left?.toFixed(2)} color="#f5a623"/>
-                <Pill label="Blink R" value={liveStats.blink_score_right?.toFixed(2)}color="#f5a623"/>
+                <Pill label="L-EAR"   value={liveStats.left_ear?.toFixed(3)}          color={liveStats.left_ear  < EAR_CLOSED ? "#ff4444" : "#4caf6e"}/>
+                <Pill label="R-EAR"   value={liveStats.right_ear?.toFixed(3)}         color={liveStats.right_ear < EAR_CLOSED ? "#ff4444" : "#4caf6e"}/>
+                <Pill label="Blink L" value={liveStats.blink_score_left?.toFixed(2)}  color="#f5a623"/>
+                <Pill label="Blink R" value={liveStats.blink_score_right?.toFixed(2)} color="#f5a623"/>
               </div>
             )}
 
-            {/* Ready buttons */}
             {phase === "ready" && (
               <div style={{ display:"flex", gap:2, marginTop:2 }}>
-                <button onClick={startRecording} style={{
-                  flex:1, padding:"14px 0", background:"#f5a623", border:"none",
-                  color:"#0e0c0a", fontSize:11, letterSpacing:4, textTransform:"uppercase",
-                  fontFamily:"'Oswald'", fontWeight:700, cursor:"pointer", transition:"all 0.2s",
-                }}
+                <button onClick={startRecording} style={{ flex:1, padding:"14px 0", background:"#f5a623", border:"none", color:"#0e0c0a", fontSize:11, letterSpacing:4, textTransform:"uppercase", fontFamily:"'Oswald'", fontWeight:700, cursor:"pointer", transition:"all 0.2s" }}
                   onMouseEnter={e=>e.target.style.background="#ffba4a"}
                   onMouseLeave={e=>e.target.style.background="#f5a623"}
                 >▶ Start {SESSION_SECONDS}s Scan</button>
-                <button onClick={reset} style={{
-                  padding:"14px 24px", background:"transparent", border:"1px solid #2a2520",
-                  color:"#4a4540", fontSize:10, letterSpacing:3, textTransform:"uppercase",
-                  fontFamily:"'Oswald'", cursor:"pointer", transition:"all 0.2s",
-                }}
+                <button onClick={reset} style={{ padding:"14px 24px", background:"transparent", border:"1px solid #2a2520", color:"#4a4540", fontSize:10, letterSpacing:3, textTransform:"uppercase", fontFamily:"'Oswald'", cursor:"pointer", transition:"all 0.2s" }}
                   onMouseEnter={e=>{ e.target.style.borderColor="#5a5550"; e.target.style.color="#c8c0b0"; }}
                   onMouseLeave={e=>{ e.target.style.borderColor="#2a2520"; e.target.style.color="#4a4540"; }}
                 >Cancel</button>
               </div>
             )}
 
-            {/* ── STOP EARLY button during recording ── */}
             {isRecording && (
-              <button onClick={stopEarly} style={{
-                width:"100%", padding:"12px 0", background:"rgba(255,68,68,0.08)",
-                border:"1px solid rgba(255,68,68,0.3)", color:"#ff6666",
-                fontSize:10, letterSpacing:3, textTransform:"uppercase",
-                fontFamily:"'Oswald'", cursor:"pointer", transition:"all 0.2s", marginTop:2,
-              }}
+              <button onClick={stopEarly} style={{ width:"100%", padding:"12px 0", background:"rgba(255,68,68,0.08)", border:"1px solid rgba(255,68,68,0.3)", color:"#ff6666", fontSize:10, letterSpacing:3, textTransform:"uppercase", fontFamily:"'Oswald'", cursor:"pointer", transition:"all 0.2s", marginTop:2 }}
                 onMouseEnter={e=>{ e.target.style.background="rgba(255,68,68,0.16)"; e.target.style.borderColor="rgba(255,68,68,0.5)"; }}
                 onMouseLeave={e=>{ e.target.style.background="rgba(255,68,68,0.08)"; e.target.style.borderColor="rgba(255,68,68,0.3)"; }}
               >■ Stop Session Early</button>
@@ -631,7 +535,6 @@ export default function Detect() {
           </div>
         )}
 
-        {/* ── DONE ── */}
         {phase === "done" && result && (
           <div style={{ width:"100%", maxWidth:500, animation:"fadeUp 0.5s ease" }}>
             <div style={{ background:"#0b0908", border:"2px solid #1e1c18", padding:"24px" }}>
@@ -640,16 +543,11 @@ export default function Detect() {
           </div>
         )}
 
-        {/* ── ERROR ── */}
         {(phase === "error" || errorMsg) && (
-          <div style={{ width:"100%", maxWidth:500, marginTop:12,
-            background:"rgba(255,68,68,0.06)", border:"1px solid rgba(255,68,68,0.2)",
-            borderLeft:"3px solid #ff4444", padding:"14px 18px",
-            fontSize:12, color:"#ff6666", fontFamily:"monospace", lineHeight:1.8 }}>
+          <div style={{ width:"100%", maxWidth:500, marginTop:12, background:"rgba(255,68,68,0.06)", border:"1px solid rgba(255,68,68,0.2)", borderLeft:"3px solid #ff4444", padding:"14px 18px", fontSize:12, color:"#ff6666", fontFamily:"monospace", lineHeight:1.8 }}>
             ⚠ {errorMsg}
             <br/>
-            <button onClick={reset} style={{ marginTop:10, background:"none", border:"none",
-              color:"#f5a623", cursor:"pointer", fontFamily:"monospace", fontSize:12, textDecoration:"underline" }}>Reset</button>
+            <button onClick={reset} style={{ marginTop:10, background:"none", border:"none", color:"#f5a623", cursor:"pointer", fontFamily:"monospace", fontSize:12, textDecoration:"underline" }}>Reset</button>
           </div>
         )}
       </div>
