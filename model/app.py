@@ -18,6 +18,7 @@ from mediapipe.tasks.python import vision
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": [
     "https://minewatch12.netlify.app",
+    "https://minewatch15.netlify.app",
     "http://localhost:5173"
 ]}})
 
@@ -69,6 +70,7 @@ def home():
 @app.route("/health")
 def health():
     return jsonify({"status": "ok"})
+
 
 
 @app.route("/uptime")
